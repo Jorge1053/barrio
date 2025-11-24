@@ -1,26 +1,92 @@
+/* Fuente principal */
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap");
+
+/* Tailwind v4 */
 @import "tailwindcss";
 
+/* ================== Variables base ================== */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Colores base (modo claro por defecto) */
+  --background: #f3f4f6;      /* fondo general */
+  --foreground: #0f172a;      /* texto principal */
+
+  --card: #ffffff;
+  --muted: #64748b;
+  --border-soft: rgba(148, 163, 184, 0.35);
+
+  --accent: #22c55e;
+  --accent-soft: rgba(34, 197, 94, 0.12);
 }
 
+/* ================== Mapa a Tailwind (inline theme) ================== */
 @theme inline {
+  /* Colores básicos que puedes usar como bg-background, text-foreground, etc. */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+
+  /* Paleta personalizada Barrio */
+  --color-b-bg: #020617; /* fondo principal oscuro */
+  --color-b-card: #020617;
+  --color-b-accent: var(--accent);
+  --color-b-accent-soft: var(--accent-soft);
+  --color-b-border: var(--border-soft);
+  --color-b-muted: var(--muted);
+  --color-b-text: #e5e7eb;
+
+  /* Tipografía */
+  --font-sans: "Poppins", system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
 }
 
+/* ================== Modo oscuro ================== */
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #020617; /* casi negro azulado */
+    --foreground: #e5e7eb;
+    --card: #020617;
   }
+}
+
+/* ================== Estilos globales ================== */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar sutil global */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.6);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Utilidad para ocultar scrollbar (usada en nav móvil) */
+.no-scrollbar {
+  -ms-overflow-style: none; /* IE y Edge */
+  scrollbar-width: none; /* Firefox */
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
 }
