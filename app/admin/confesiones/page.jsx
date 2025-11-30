@@ -1,7 +1,7 @@
 // src/app/admin/confesiones/page.jsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 export default function AdminConfesionesPage() {
   const [items, setItems] = useState([]);
@@ -38,7 +38,8 @@ export default function AdminConfesionesPage() {
   }
 
   async function updateConfession(id, action) {
-    if (!window.confirm(`¿Seguro que quieres ${action} esta confesión?`)) return;
+    if (!window.confirm(`¿Seguro que quieres ${action} esta confesión?`))
+      return;
     try {
       const res = await fetch("/api/admin/confesiones", {
         method: "PATCH",
@@ -103,28 +104,41 @@ export default function AdminConfesionesPage() {
             Moderación de confesiones
           </h2>
           <p className="text-xs text-slate-400">
-            Revisa contenido, aprueba lo que cumpla las reglas y elimina lo que pueda dañar a alguien.
+            Revisa contenido, aprueba lo que cumpla las reglas y elimina lo que
+            pueda dañar a alguien.
           </p>
         </div>
-        <select
-          className="bg-slate-950 border border-slate-700 rounded-full px-3 py-1 text-xs"
-          value={statusFilter}
-          onChange={(e) => {
-            const val = e.target.value;
-            setStatusFilter(val);
-            fetchData(val);
-          }}
-        >
-          <option value="pending">Pendientes</option>
-          <option value="approved">Aprobadas</option>
-          <option value="rejected">Rechazadas</option>
-        </select>
+        <div className="flex items-center gap-2 text-xs">
+          <select
+            className="bg-slate-950 border border-slate-700 rounded-full px-3 py-1 text-xs"
+            value={statusFilter}
+            onChange={(e) => {
+              const val = e.target.value;
+              setStatusFilter(val);
+              fetchData(val);
+            }}
+          >
+            <option value="pending">Pendientes</option>
+            <option value="approved">Aprobadas</option>
+            <option value="rejected">Rechazadas</option>
+            <option value="all">Todas</option>
+          </select>
+          <button
+            type="button"
+            onClick={() => fetchData(statusFilter)}
+            className="px-3 py-1 rounded-full bg-slate-800 hover:bg-slate-700"
+          >
+            Refrescar
+          </button>
+        </div>
       </header>
 
       <section className="space-y-3">
         {loading && <p className="text-sm text-slate-400">Cargando...</p>}
         {items.length === 0 && !loading && (
-          <p className="text-sm text-slate-400">No hay confesiones en este estado.</p>
+          <p className="text-sm text-slate-400">
+            No hay confesiones en este estado.
+          </p>
         )}
         {items.map((c) => (
           <article
@@ -135,10 +149,27 @@ export default function AdminConfesionesPage() {
               <span>
                 {c.city}
                 {c.university ? ` · ${c.university}` : ""} · {c.category}
+                {c.intention && (
+                  <span className="ml-2 inline-flex items-center rounded-full bg-slate-800 px-2 py-0.5 text-[10px] text-slate-200">
+                    {c.intention === "advice" && "🧠 Consejo"}
+                    {c.intention === "vent" && "💭 Desahogo"}
+                    {c.intention === "story" && "📖 Historia"}
+                  </span>
+                )}
               </span>
               <span>{new Date(c.created_at).toLocaleString("es-AR")}</span>
             </div>
-            <p className="text-slate-100 whitespace-pre-wrap mb-3">{c.content}</p>
+            <p className="text-slate-100 whitespace-pre-wrap mb-3">
+              {c.content}
+            </p>
+
+            {c.is_truth_or_fake && (
+              <p className="mb-2 text-[11px] text-slate-400">
+                🎯 En juego "¿Verdad o falso?" · ✅ {c.truth_votes ?? 0} · ❌{" "}
+                {c.fake_votes ?? 0}
+              </p>
+            )}
+
             <div className="flex flex-wrap gap-2 text-xs">
               {c.status !== "approved" && (
                 <button
@@ -158,6 +189,26 @@ export default function AdminConfesionesPage() {
                   Rechazar
                 </button>
               )}
+
+              {!c.is_truth_or_fake && c.status === "approved" && (
+                <button
+                  type="button"
+                  onClick={() => updateConfession(c.id, "add_truth_or_fake")}
+                  className="px-3 py-1 rounded-full bg-violet-500/90 hover:bg-violet-400 text-slate-950 font-medium"
+                >
+                  Añadir a "¿Verdad o falso?"
+                </button>
+              )}
+              {c.is_truth_or_fake && (
+                <button
+                  type="button"
+                  onClick={() => updateConfession(c.id, "remove_truth_or_fake")}
+                  className="px-3 py-1 rounded-full bg-slate-700 hover:bg-slate-600 text-slate-100"
+                >
+                  Quitar de "¿Verdad o falso?"
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={() => updateConfession(c.id, "delete")}

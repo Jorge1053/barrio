@@ -1,12 +1,13 @@
 // src/app/admin/page.jsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 
 const CONF_STATUS_LABELS = {
   pending: "Pendientes",
   approved: "Aprobadas",
   rejected: "Rechazadas",
+  all: "Todas",
 };
 
 export default function AdminDashboardPage() {
@@ -20,6 +21,7 @@ export default function AdminDashboardPage() {
   const [confStatusFilter, setConfStatusFilter] = useState("pending");
   const [confLoading, setConfLoading] = useState(false);
   const [confessions, setConfessions] = useState([]);
+  const [showOnlyTruthOrFake, setShowOnlyTruthOrFake] = useState(false);
 
   // Reportes
   const [reportsHandledFilter, setReportsHandledFilter] = useState("unhandled"); // "unhandled" | "all"
@@ -31,7 +33,6 @@ export default function AdminDashboardPage() {
     e.preventDefault();
     if (!token) return;
     setError("");
-    // probamos cargando confesiones pendientes
     try {
       setConfLoading(true);
       const res = await fetch(`/api/admin/confesiones?status=pending`, {
@@ -73,8 +74,17 @@ export default function AdminDashboardPage() {
   }
 
   async function handleConfessionAction(id, action) {
-    if (!window.confirm(`¿Seguro que quieres ${action} esta confesión?`))
-      return;
+    let msg = "";
+    if (action === "approve") msg = "aprobar esta confesión";
+    if (action === "reject") msg = "rechazar esta confesión";
+    if (action === "delete") msg = "ELIMINAR definitivamente esta confesión";
+    if (action === "add_truth_or_fake")
+      msg = 'añadirla al formato "¿Esto es verdad o falso?"';
+    if (action === "remove_truth_or_fake")
+      msg = 'quitarla del formato "¿Esto es verdad o falso?"';
+
+    if (!window.confirm(`¿Seguro que quieres ${msg}?`)) return;
+
     try {
       const res = await fetch("/api/admin/confesiones", {
         method: "PATCH",
@@ -86,7 +96,6 @@ export default function AdminDashboardPage() {
       });
       if (!res.ok) throw new Error("Error al actualizar confesión.");
       await fetchConfessions();
-      // después de afectar una confesión también recargamos reportes por si se eliminaron
       await fetchReports(reportsHandledFilter);
     } catch (err) {
       console.error(err);
@@ -137,7 +146,6 @@ export default function AdminDashboardPage() {
       });
       if (!res.ok) throw new Error("Error al actualizar reporte.");
       await fetchReports();
-      // si eliminaste confesión, refrescá lista de confesiones
       if (action === "delete_confession") {
         await fetchConfessions();
       }
@@ -170,6 +178,11 @@ export default function AdminDashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reportsHandledFilter]);
 
+  const filteredConfessions = useMemo(() => {
+    if (!showOnlyTruthOrFake) return confessions;
+    return confessions.filter((c) => c.is_truth_or_fake);
+  }, [confessions, showOnlyTruthOrFake]);
+
   // ---------- UI LOGIN ----------
   if (!authed) {
     return (
@@ -186,7 +199,7 @@ export default function AdminDashboardPage() {
             type="password"
             value={token}
             onChange={(e) => setToken(e.target.value)}
-            placeholder="ADMIN_API_TOKEN"
+            placeholder="PASSWORD"
             className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
           />
           {error && (
@@ -207,25 +220,30 @@ export default function AdminDashboardPage() {
 
   // ---------- UI DASHBOARD ----------
   return (
-    <main className="space-y-6">
-      <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+    <main className="grid gap-6 md:grid-cols-[260px,1fr]">
+      {/* SIDEBAR */}
+      <aside className="space-y-4 rounded-2xl border border-slate-800 bg-slate-950/70 p-3">
         <div>
-          <h2 className="text-lg font-semibold text-slate-100">
+          <h2 className="text-sm font-semibold text-slate-100">
             Panel de moderación
           </h2>
-          <p className="text-xs text-slate-400">
-            Revisa confesiones, responde a reportes y mantén la comunidad
-            segura.
+          <p className="mt-1 text-xs text-slate-400">
+            Gestioná confesiones, reportes y el juego de{" "}
+            <span className="font-semibold text-pink-300">
+              ¿Verdad o falso?
+            </span>
           </p>
         </div>
-        <div className="inline-flex items-center gap-2 text-xs">
+
+        {/* Tabs principales */}
+        <div className="flex gap-2 rounded-2xl bg-slate-900/80 p-1 text-xs">
           <button
             type="button"
             onClick={() => setActiveTab("confessions")}
-            className={`px-3 py-1 rounded-full border ${
+            className={`flex-1 rounded-xl px-3 py-1.5 font-medium ${
               activeTab === "confessions"
-                ? "bg-pink-500 text-slate-950 border-pink-400"
-                : "bg-slate-950 border-slate-700 text-slate-300 hover:border-pink-400/60"
+                ? "bg-pink-500 text-slate-950"
+                : "text-slate-300 hover:bg-slate-800/80"
             }`}
           >
             Confesiones
@@ -233,290 +251,428 @@ export default function AdminDashboardPage() {
           <button
             type="button"
             onClick={() => setActiveTab("reports")}
-            className={`px-3 py-1 rounded-full border ${
+            className={`flex-1 rounded-xl px-3 py-1.5 font-medium ${
               activeTab === "reports"
-                ? "bg-pink-500 text-slate-950 border-pink-400"
-                : "bg-slate-950 border-slate-700 text-slate-300 hover:border-pink-400/60"
+                ? "bg-pink-500 text-slate-950"
+                : "text-slate-300 hover:bg-slate-800/80"
             }`}
           >
             Reportes
           </button>
         </div>
-      </header>
 
-      {error && (
-        <p className="text-xs text-red-400 bg-red-950/40 border border-red-800 rounded-xl px-3 py-2">
-          {error}
-        </p>
-      )}
-
-      {/* --------- TAB CONFESIONES --------- */}
-      {activeTab === "confessions" && (
-        <section className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="text-xs text-slate-400">
-              Estado actual:{" "}
-              <span className="font-semibold text-slate-200">
-                {CONF_STATUS_LABELS[confStatusFilter]}
-              </span>
-            </div>
-            <div className="inline-flex items-center gap-2 text-xs">
-              <select
-                className="bg-slate-950 border border-slate-700 rounded-full px-3 py-1 text-xs text-slate-200"
-                value={confStatusFilter}
-                onChange={(e) => setConfStatusFilter(e.target.value)}
-              >
-                <option value="pending">Pendientes</option>
-                <option value="approved">Aprobadas</option>
-                <option value="rejected">Rechazadas</option>
-              </select>
-              <button
-                type="button"
-                onClick={() => fetchConfessions(confStatusFilter)}
-                className="px-3 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-xs"
-              >
-                Refrescar
-              </button>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            {confLoading && (
-              <p className="text-sm text-slate-400">Cargando confesiones...</p>
-            )}
-            {!confLoading && confessions.length === 0 && (
-              <p className="text-sm text-slate-400">
-                No hay confesiones en este estado.
+        {/* Filtros de confesiones */}
+        {activeTab === "confessions" && (
+          <div className="space-y-3 text-xs">
+            <div>
+              <p className="mb-1 text-[11px] font-semibold text-slate-300">
+                Estado de confesiones
               </p>
-            )}
-            {confessions.map((c) => (
-              <article
-                key={c.id}
-                className="rounded-xl border border-slate-800 bg-slate-900/70 p-3 text-sm"
-              >
-                <div className="flex items-center justify-between text-[11px] text-slate-400 mb-2">
-                  <span>
-                    {c.city}
-                    {c.university ? ` · ${c.university}` : ""} ·{" "}
-                    <span className="uppercase">{c.category}</span>
-                  </span>
-                  <span>{new Date(c.created_at).toLocaleString("es-AR")}</span>
-                </div>
-                <p className="text-slate-100 whitespace-pre-wrap mb-3">
-                  {c.content}
-                </p>
-                <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400 mb-2">
-                  <span>
-                    ❤️ {c.likes_count} · 😮 {c.wow_count} · 😂 {c.haha_count}
-                  </span>
-                  <span>
-                    Estado:{" "}
-                    <span
-                      className={
-                        c.status === "approved"
-                          ? "text-emerald-400"
-                          : c.status === "rejected"
-                          ? "text-yellow-400"
-                          : "text-sky-400"
-                      }
-                    >
-                      {CONF_STATUS_LABELS[c.status] || c.status}
-                    </span>
-                  </span>
-                </div>
-                <div className="flex flex-wrap gap-2 text-xs">
-                  {c.status !== "approved" && (
-                    <button
-                      type="button"
-                      onClick={() => handleConfessionAction(c.id, "approve")}
-                      className="px-3 py-1 rounded-full bg-emerald-500/90 hover:bg-emerald-400 text-slate-950 font-medium"
-                    >
-                      Aprobar
-                    </button>
-                  )}
-                  {c.status !== "rejected" && (
-                    <button
-                      type="button"
-                      onClick={() => handleConfessionAction(c.id, "reject")}
-                      className="px-3 py-1 rounded-full bg-yellow-500/90 hover:bg-yellow-400 text-slate-950 font-medium"
-                    >
-                      Rechazar
-                    </button>
-                  )}
+              <div className="space-y-1">
+                {["pending", "approved", "rejected", "all"].map((status) => (
                   <button
+                    key={status}
                     type="button"
-                    onClick={() => handleConfessionAction(c.id, "delete")}
-                    className="px-3 py-1 rounded-full bg-red-600/90 hover:bg-red-500 text-slate-50"
+                    onClick={() => setConfStatusFilter(status)}
+                    className={`flex w-full items-center justify-between rounded-xl px-3 py-1.5 ${
+                      confStatusFilter === status
+                        ? "bg-slate-800 text-slate-50"
+                        : "text-slate-300 hover:bg-slate-900"
+                    }`}
                   >
-                    Eliminar
+                    <span>{CONF_STATUS_LABELS[status]}</span>
+                    {confStatusFilter === status && (
+                      <span className="h-1.5 w-1.5 rounded-full bg-pink-400" />
+                    )}
                   </button>
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* --------- TAB REPORTES --------- */}
-      {activeTab === "reports" && (
-        <section className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="text-xs text-slate-400">
-              Mostrando:{" "}
-              <span className="font-semibold text-slate-200">
-                {reportsHandledFilter === "unhandled"
-                  ? "Reportes pendientes"
-                  : "Todos los reportes"}
-              </span>
+                ))}
+              </div>
             </div>
-            <div className="inline-flex items-center gap-2 text-xs">
-              <select
-                className="bg-slate-950 border border-slate-700 rounded-full px-3 py-1 text-xs text-slate-200"
-                value={reportsHandledFilter}
-                onChange={(e) => setReportsHandledFilter(e.target.value)}
-              >
-                <option value="unhandled">Pendientes</option>
-                <option value="all">Todos</option>
-              </select>
+
+            <div className="h-px bg-slate-800" />
+
+            <div className="space-y-1.5">
+              <p className="text-[11px] font-semibold text-slate-300">
+                Juego "¿Verdad o falso?"
+              </p>
+              <label className="flex items-center gap-2 text-[11px] text-slate-300">
+                <input
+                  type="checkbox"
+                  checked={showOnlyTruthOrFake}
+                  onChange={(e) => setShowOnlyTruthOrFake(e.target.checked)}
+                  className="h-3 w-3 rounded border-slate-600 bg-slate-950 text-pink-500"
+                />
+                <span>Mostrar solo confesiones en el juego VF</span>
+              </label>
+              <p className="text-[10px] text-slate-500">
+                Igual podés añadir o quitar cada confesión al juego desde la
+                lista.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Filtros de reportes */}
+        {activeTab === "reports" && (
+          <div className="space-y-3 text-xs">
+            <p className="text-[11px] font-semibold text-slate-300">
+              Estado de reportes
+            </p>
+            <div className="space-y-1">
               <button
                 type="button"
-                onClick={() => fetchReports(reportsHandledFilter)}
-                className="px-3 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-xs"
+                onClick={() => setReportsHandledFilter("unhandled")}
+                className={`flex w-full items-center justify-between rounded-xl px-3 py-1.5 ${
+                  reportsHandledFilter === "unhandled"
+                    ? "bg-slate-800 text-slate-50"
+                    : "text-slate-300 hover:bg-slate-900"
+                }`}
               >
-                Refrescar
+                <span>Pendientes</span>
+                {reportsHandledFilter === "unhandled" && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-yellow-400" />
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setReportsHandledFilter("all")}
+                className={`flex w-full items-center justify-between rounded-xl px-3 py-1.5 ${
+                  reportsHandledFilter === "all"
+                    ? "bg-slate-800 text-slate-50"
+                    : "text-slate-300 hover:bg-slate-900"
+                }`}
+              >
+                <span>Todos</span>
+                {reportsHandledFilter === "all" && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-pink-400" />
+                )}
               </button>
             </div>
           </div>
+        )}
+      </aside>
 
-          <div className="space-y-3">
-            {reportsLoading && (
-              <p className="text-sm text-slate-400">Cargando reportes...</p>
-            )}
-            {!reportsLoading && reports.length === 0 && (
-              <p className="text-sm text-slate-400">
-                No hay reportes para este filtro.
-              </p>
-            )}
-            {reports.map((r) => (
-              <article
-                key={r.id}
-                className="rounded-xl border border-slate-800 bg-slate-900/70 p-3 text-sm"
-              >
-                <div className="flex items-center justify-between text-[11px] text-slate-400 mb-2">
-                  <span>
-                    Reporte ·{" "}
-                    {r.handled ? (
-                      <span className="text-emerald-400 font-medium">
-                        Gestionado
-                      </span>
-                    ) : (
-                      <span className="text-yellow-400 font-medium">
-                        Pendiente
-                      </span>
-                    )}
+      {/* CONTENIDO PRINCIPAL */}
+      <section className="space-y-6">
+        {error && (
+          <p className="text-xs text-red-400 bg-red-950/40 border border-red-800 rounded-xl px-3 py-2">
+            {error}
+          </p>
+        )}
+
+        {/* --------- TAB CONFESIONES --------- */}
+        {activeTab === "confessions" && (
+          <section className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="text-xs text-slate-400">
+                Mostrando:{" "}
+                <span className="font-semibold text-slate-200">
+                  {CONF_STATUS_LABELS[confStatusFilter]}
+                </span>
+                {showOnlyTruthOrFake && (
+                  <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-violet-500/10 px-2 py-0.5 text-[10px] text-violet-200">
+                    🎯 Solo en "¿Verdad o falso?"
                   </span>
-                  <span>{new Date(r.created_at).toLocaleString("es-AR")}</span>
-                </div>
-                <p className="text-xs text-slate-300 mb-2">
-                  Motivo del reporte:{" "}
-                  <span className="text-slate-100">{r.reason}</span>
-                </p>
+                )}
+              </div>
+              <div className="inline-flex items-center gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => fetchConfessions(confStatusFilter)}
+                  className="px-3 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-xs"
+                >
+                  Refrescar
+                </button>
+              </div>
+            </div>
 
-                {r.confession ? (
-                  <div className="mt-2 rounded-lg bg-slate-950/60 border border-slate-800 p-2">
-                    <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1">
+            <div className="space-y-3">
+              {confLoading && (
+                <p className="text-sm text-slate-400">
+                  Cargando confesiones...
+                </p>
+              )}
+              {!confLoading && filteredConfessions.length === 0 && (
+                <p className="text-sm text-slate-400">
+                  No hay confesiones para este filtro.
+                </p>
+              )}
+              {filteredConfessions.map((c) => (
+                <article
+                  key={c.id}
+                  className="rounded-xl border border-slate-800 bg-slate-900/70 p-3 text-sm"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400 mb-2">
+                    <span>
+                      {c.city}
+                      {c.university ? ` · ${c.university}` : ""} ·{" "}
+                      <span className="uppercase">{c.category}</span>
+                      {c.intention && (
+                        <span className="ml-2 inline-flex items-center rounded-full bg-slate-800 px-2 py-0.5 text-[10px] text-slate-200">
+                          {c.intention === "advice" && "🧠 Consejo"}
+                          {c.intention === "vent" && "💭 Desahogo"}
+                          {c.intention === "story" && "📖 Historia"}
+                        </span>
+                      )}
+                    </span>
+                    <span>
+                      {new Date(c.created_at).toLocaleString("es-AR")}
+                    </span>
+                  </div>
+
+                  <p className="text-slate-100 whitespace-pre-wrap mb-3">
+                    {c.content}
+                  </p>
+
+                  {/* Reacciones + estado + badge VF */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400 mb-2">
+                    <span>
+                      ❤️ {c.likes_count} · 😮 {c.wow_count} · 😂 {c.haha_count}
+                    </span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {c.is_truth_or_fake && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-violet-500/15 px-2.5 py-1 text-[10px] font-semibold text-violet-200">
+                          <span>🎯</span>
+                          <span>¿Verdad o falso?</span>
+                        </span>
+                      )}
                       <span>
-                        {r.confession.city}
-                        {r.confession.university
-                          ? ` · ${r.confession.university}`
-                          : ""}{" "}
-                        · {r.confession.category}
-                      </span>
-                      <span>
-                        {new Date(r.confession.created_at).toLocaleString(
-                          "es-AR"
-                        )}
+                        Estado:{" "}
+                        <span
+                          className={
+                            c.status === "approved"
+                              ? "text-emerald-400"
+                              : c.status === "rejected"
+                              ? "text-yellow-400"
+                              : "text-sky-400"
+                          }
+                        >
+                          {CONF_STATUS_LABELS[c.status] || c.status}
+                        </span>
                       </span>
                     </div>
-                    <p className="text-xs text-slate-100 whitespace-pre-wrap mb-1">
-                      {r.confession.content.length > 300
-                        ? r.confession.content.slice(0, 300) + "..."
-                        : r.confession.content}
-                    </p>
-                    <p className="text-[11px] text-slate-500">
-                      Estado actual:{" "}
-                      <span
-                        className={
-                          r.confession.status === "approved"
-                            ? "text-emerald-400"
-                            : r.confession.status === "rejected"
-                            ? "text-yellow-400"
-                            : "text-sky-400"
-                        }
-                      >
-                        {CONF_STATUS_LABELS[r.confession.status] ||
-                          r.confession.status}
-                      </span>
-                    </p>
                   </div>
-                ) : (
-                  <p className="text-xs text-slate-500 mt-2">
-                    La confesión asociada ya no existe (fue eliminada).
-                  </p>
-                )}
 
-                <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                  {!r.handled && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        handleReportAction(
-                          r.id,
-                          "mark_handled",
-                          r.confession?.id
-                        )
-                      }
-                      className="px-3 py-1 rounded-full bg-emerald-500/90 hover:bg-emerald-400 text-slate-950 font-medium"
-                    >
-                      Marcar gestionado
-                    </button>
+                  {/* Stats de votos VF si aplica */}
+                  {c.is_truth_or_fake && (
+                    <p className="mb-2 text-[11px] text-slate-400">
+                      Votos VF: ✅ {c.truth_votes ?? 0} · ❌ {c.fake_votes ?? 0}
+                    </p>
                   )}
-                  {r.handled && (
+
+                  <div className="flex flex-wrap gap-2 text-xs">
+                    {c.status !== "approved" && (
+                      <button
+                        type="button"
+                        onClick={() => handleConfessionAction(c.id, "approve")}
+                        className="px-3 py-1 rounded-full bg-emerald-500/90 hover:bg-emerald-400 text-slate-950 font-medium"
+                      >
+                        Aprobar
+                      </button>
+                    )}
+                    {c.status !== "rejected" && (
+                      <button
+                        type="button"
+                        onClick={() => handleConfessionAction(c.id, "reject")}
+                        className="px-3 py-1 rounded-full bg-yellow-500/90 hover:bg-yellow-400 text-slate-950 font-medium"
+                      >
+                        Rechazar
+                      </button>
+                    )}
+
+                    {/* Botones para el formato "¿Verdad o falso?" */}
+                    {c.status === "approved" && !c.is_truth_or_fake && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleConfessionAction(c.id, "add_truth_or_fake")
+                        }
+                        className="px-3 py-1 rounded-full bg-violet-500/90 hover:bg-violet-400 text-slate-950 font-medium"
+                      >
+                        Añadir a "¿Verdad o falso?"
+                      </button>
+                    )}
+                    {c.is_truth_or_fake && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleConfessionAction(c.id, "remove_truth_or_fake")
+                        }
+                        className="px-3 py-1 rounded-full bg-slate-700 hover:bg-slate-600 text-slate-100"
+                      >
+                        Quitar de "¿Verdad o falso?"
+                      </button>
+                    )}
+
                     <button
                       type="button"
-                      onClick={() =>
-                        handleReportAction(
-                          r.id,
-                          "mark_unhandled",
-                          r.confession?.id
-                        )
-                      }
-                      className="px-3 py-1 rounded-full bg-slate-700 hover:bg-slate-600 text-slate-100"
-                    >
-                      Volver a pendiente
-                    </button>
-                  )}
-                  {r.confession && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        handleReportAction(
-                          r.id,
-                          "delete_confession",
-                          r.confession.id
-                        )
-                      }
+                      onClick={() => handleConfessionAction(c.id, "delete")}
                       className="px-3 py-1 rounded-full bg-red-600/90 hover:bg-red-500 text-slate-50"
                     >
-                      Eliminar confesión
+                      Eliminar
                     </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* --------- TAB REPORTES --------- */}
+        {activeTab === "reports" && (
+          <section className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="text-xs text-slate-400">
+                Mostrando:{" "}
+                <span className="font-semibold text-slate-200">
+                  {reportsHandledFilter === "unhandled"
+                    ? "Reportes pendientes"
+                    : "Todos los reportes"}
+                </span>
+              </div>
+              <div className="inline-flex items-center gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => fetchReports(reportsHandledFilter)}
+                  className="px-3 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-xs"
+                >
+                  Refrescar
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {reportsLoading && (
+                <p className="text-sm text-slate-400">Cargando reportes...</p>
+              )}
+              {!reportsLoading && reports.length === 0 && (
+                <p className="text-sm text-slate-400">
+                  No hay reportes para este filtro.
+                </p>
+              )}
+              {reports.map((r) => (
+                <article
+                  key={r.id}
+                  className="rounded-xl border border-slate-800 bg-slate-900/70 p-3 text-sm"
+                >
+                  <div className="flex items-center justify-between text-[11px] text-slate-400 mb-2">
+                    <span>
+                      Reporte ·{" "}
+                      {r.handled ? (
+                        <span className="text-emerald-400 font-medium">
+                          Gestionado
+                        </span>
+                      ) : (
+                        <span className="text-yellow-400 font-medium">
+                          Pendiente
+                        </span>
+                      )}
+                    </span>
+                    <span>
+                      {new Date(r.created_at).toLocaleString("es-AR")}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300 mb-2">
+                    Motivo del reporte:{" "}
+                    <span className="text-slate-100">{r.reason}</span>
+                  </p>
+
+                  {r.confession ? (
+                    <div className="mt-2 rounded-lg bg-slate-950/60 border border-slate-800 p-2">
+                      <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1">
+                        <span>
+                          {r.confession.city}
+                          {r.confession.university
+                            ? ` · ${r.confession.university}`
+                            : ""}{" "}
+                          · {r.confession.category}
+                        </span>
+                        <span>
+                          {new Date(r.confession.created_at).toLocaleString(
+                            "es-AR"
+                          )}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-100 whitespace-pre-wrap mb-1">
+                        {r.confession.content.length > 300
+                          ? r.confession.content.slice(0, 300) + "..."
+                          : r.confession.content}
+                      </p>
+                      <p className="text-[11px] text-slate-500">
+                        Estado actual:{" "}
+                        <span
+                          className={
+                            r.confession.status === "approved"
+                              ? "text-emerald-400"
+                              : r.confession.status === "rejected"
+                              ? "text-yellow-400"
+                              : "text-sky-400"
+                          }
+                        >
+                          {CONF_STATUS_LABELS[r.confession.status] ||
+                            r.confession.status}
+                        </span>
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-500 mt-2">
+                      La confesión asociada ya no existe (fue eliminada).
+                    </p>
                   )}
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
-      )}
+
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                    {!r.handled && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleReportAction(
+                            r.id,
+                            "mark_handled",
+                            r.confession?.id
+                          )
+                        }
+                        className="px-3 py-1 rounded-full bg-emerald-500/90 hover:bg-emerald-400 text-slate-950 font-medium"
+                      >
+                        Marcar gestionado
+                      </button>
+                    )}
+                    {r.handled && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleReportAction(
+                            r.id,
+                            "mark_unhandled",
+                            r.confession?.id
+                          )
+                        }
+                        className="px-3 py-1 rounded-full bg-slate-700 hover:bg-slate-600 text-slate-100"
+                      >
+                        Volver a pendiente
+                      </button>
+                    )}
+                    {r.confession && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleReportAction(
+                            r.id,
+                            "delete_confession",
+                            r.confession.id
+                          )
+                        }
+                        className="px-3 py-1 rounded-full bg-red-600/90 hover:bg-red-500 text-slate-50"
+                      >
+                        Eliminar confesión
+                      </button>
+                    )}
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        )}
+      </section>
     </main>
   );
 }

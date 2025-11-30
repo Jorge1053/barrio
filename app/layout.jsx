@@ -24,8 +24,7 @@ export default function RootLayout({ children }) {
                 </h1>
               </Link>
               <p className="text-sm text-slate-400">
-                Confesiones anónimas por ciudad y universidad. Nada de nombres,
-                nada de odio.
+                Confesiones anónimas por ciudad y universidad. Nada de odio.
               </p>
             </div>
 

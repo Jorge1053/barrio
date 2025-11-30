@@ -29,20 +29,30 @@ function containsPersonalData(text) {
 export async function POST(req) {
   try {
     const body = await req.json();
-    const { city, university, category, content } = body || {};
+    const {
+      city,
+      university,
+      category,
+      content,
+      intention: rawIntention,
+      prompt_id,
+    } = body || {};
 
+    // ---- VALIDACIONES BÁSICAS ----
     if (!city || typeof city !== "string") {
       return NextResponse.json(
         { message: "La ciudad es obligatoria." },
         { status: 400 }
       );
     }
+
     if (!category || typeof category !== "string") {
       return NextResponse.json(
         { message: "La categoría es obligatoria." },
         { status: 400 }
       );
     }
+
     const allowedCategories = [
       "amor",
       "estudio",
@@ -56,6 +66,16 @@ export async function POST(req) {
         { message: "Categoría no permitida." },
         { status: 400 }
       );
+    }
+
+    // ---- VALIDAR INTENTIÓN ----
+    const allowedIntentions = ["advice", "vent", "story"];
+    let intention =
+      typeof rawIntention === "string" ? rawIntention.trim() : "advice";
+
+    if (!allowedIntentions.includes(intention)) {
+      // fallback seguro → mismo default que en el form
+      intention = "advice";
     }
 
     const text = (content || "").toString().trim();
@@ -89,27 +109,27 @@ export async function POST(req) {
     const fingerprint = getRequestFingerprint(req.headers);
     const supabase = createSupabaseServerClient();
 
-    // rate limiting básico: máx 3 confesiones por día por fingerprint
-    const { count, error: countError } = await supabase
-      .from("confessions")
-      .select("id", { count: "exact", head: true })
-      .eq("fingerprint", fingerprint)
-      .gte(
-        "created_at",
-        new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-      );
-
-    if (countError) {
-      console.error(countError);
-    } else if (count >= 3) {
-      return NextResponse.json(
-        {
-          message:
-            "Se alcanzó el límite diario de confesiones desde este dispositivo. Inténtalo de nuevo mañana.",
-        },
-        { status: 429 }
-      );
-    }
+    // 🔹 Rate limiting DESACTIVADO temporalmente para pruebas
+    // const { count, error: countError } = await supabase
+    //   .from("confessions")
+    //   .select("id", { count: "exact", head: true })
+    //   .eq("fingerprint", fingerprint)
+    //   .gte(
+    //     "created_at",
+    //     new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+    //   );
+    //
+    // if (countError) {
+    //   console.error(countError);
+    // } else if (count >= 3) {
+    //   return NextResponse.json(
+    //     {
+    //       message:
+    //         "Se alcanzó el límite diario de confesiones desde este dispositivo. Inténtalo de nuevo mañana.",
+    //     },
+    //     { status: 429 }
+    //   );
+    // }
 
     const { error } = await supabase.from("confessions").insert({
       city,
@@ -118,6 +138,9 @@ export async function POST(req) {
       content: text,
       status: "pending", // se modera en panel admin
       fingerprint,
+      // 🔹 NUEVO: guardamos intención y prompt_id
+      intention,
+      prompt_id: prompt_id || null,
     });
 
     if (error) {

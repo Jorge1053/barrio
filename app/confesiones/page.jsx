@@ -261,8 +261,8 @@ export default function ConfesionesPage() {
         </section>
       )}
 
-      {/* FEATURE CARDS */}
-      <section className="grid grid-cols-1 gap-3 md:grid-cols-3">
+      {/* FEATURE CARDS (incluye "¿Esto es verdad o falso?") */}
+      <section className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
         {/* Random */}
         <Link
           href="/confesiones/random"
@@ -353,6 +353,29 @@ export default function ConfesionesPage() {
               className="h-16 w-16 object-contain drop-shadow-[0_8px_18px_rgba(0,0,0,0.45)] md:h-20 md:w-20"
             />
           </div>
+        </Link>
+
+        {/* ¿Esto es verdad o falso? */}
+        <Link
+          href="/confesiones/verdad-o-falso"
+          className="group flex flex-col justify-between gap-3 rounded-2xl border border-violet-500/50 bg-violet-500/10 px-4 py-3"
+        >
+          <div className="space-y-1">
+            <p className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-violet-200">
+              <span>🎯</span>
+              <span>Nuevo formato</span>
+            </p>
+            <h2 className="text-sm font-semibold text-violet-50">
+              ¿Esto es verdad o falso?
+            </h2>
+            <p className="text-xs text-violet-100/90">
+              Publicamos confesiones que parecen mentira. Leés la historia y
+              votás si creés que pasó de verdad o es puro humo.
+            </p>
+          </div>
+          <span className="mt-1 inline-flex items-center justify-between text-[11px] font-medium text-violet-100 group-hover:text-violet-50">
+            <span>Entrar a votar →</span>
+          </span>
         </Link>
       </section>
 

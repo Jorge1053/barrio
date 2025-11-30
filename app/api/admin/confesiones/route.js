@@ -8,7 +8,7 @@ function checkAuth(req) {
   return token && token === process.env.ADMIN_API_TOKEN;
 }
 
-// GET /api/admin/confesiones?status=pending|approved|rejected
+// GET /api/admin/confesiones?status=pending|approved|rejected|all
 export async function GET(req) {
   if (!checkAuth(req)) {
     return NextResponse.json({ message: "No autorizado" }, { status: 401 });
@@ -18,14 +18,34 @@ export async function GET(req) {
   const { searchParams } = new URL(req.url);
   const status = searchParams.get("status") || "pending";
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("confessions")
     .select(
-      "id, city, university, category, content, created_at, status, likes_count, wow_count, haha_count"
+      `
+      id,
+      city,
+      university,
+      category,
+      content,
+      created_at,
+      status,
+      likes_count,
+      wow_count,
+      haha_count,
+      intention,
+      is_truth_or_fake,
+      truth_votes,
+      fake_votes
+    `
     )
-    .eq("status", status)
     .order("created_at", { ascending: false })
-    .limit(200);
+    .limit(500);
+
+  if (status !== "all") {
+    query = query.eq("status", status);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     console.error(error);
@@ -39,7 +59,10 @@ export async function GET(req) {
 }
 
 // PATCH /api/admin/confesiones
-// body: { id, action: "approve" | "reject" | "delete" }
+// body: { id, action:
+//   "approve" | "reject" | "delete" |
+//   "add_truth_or_fake" | "remove_truth_or_fake"
+// }
 export async function PATCH(req) {
   if (!checkAuth(req)) {
     return NextResponse.json({ message: "No autorizado" }, { status: 401 });
@@ -49,17 +72,48 @@ export async function PATCH(req) {
   const body = await req.json();
   const { id, action } = body || {};
 
-  if (!id || !["approve", "reject", "delete"].includes(action)) {
+  const ALLOWED = [
+    "approve",
+    "reject",
+    "delete",
+    "add_truth_or_fake",
+    "remove_truth_or_fake",
+  ];
+
+  if (!id || !ALLOWED.includes(action)) {
     return NextResponse.json({ message: "Datos inválidos" }, { status: 400 });
   }
 
   try {
+    // Eliminar confesión
     if (action === "delete") {
-      const { error } = await supabase.from("confessions").delete().eq("id", id);
+      const { error } = await supabase
+        .from("confessions")
+        .delete()
+        .eq("id", id);
       if (error) throw error;
       return NextResponse.json({ message: "Confesión eliminada" });
     }
 
+    // Marcar / desmarcar para el formato "¿Verdad o falso?"
+    if (action === "add_truth_or_fake" || action === "remove_truth_or_fake") {
+      const is_truth_or_fake = action === "add_truth_or_fake";
+
+      const { error } = await supabase
+        .from("confessions")
+        .update({ is_truth_or_fake })
+        .eq("id", id);
+
+      if (error) throw error;
+
+      return NextResponse.json({
+        message: is_truth_or_fake
+          ? 'Marcada para "¿Verdad o falso?"'
+          : 'Quitada de "¿Verdad o falso?"',
+      });
+    }
+
+    // Aprobar / rechazar
     const newStatus = action === "approve" ? "approved" : "rejected";
     const { error } = await supabase
       .from("confessions")
