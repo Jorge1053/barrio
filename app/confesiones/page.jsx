@@ -1,7 +1,7 @@
 // src/app/confesiones/page.jsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import ConfessionCard from "../../components/ConfessionCard";
@@ -42,6 +42,46 @@ const intentionLabels = {
   vent: "Necesita desahogarse",
   story: "Historia para compartir",
 };
+
+// --- helpers fechas ---
+
+function getDateKey(created_at) {
+  if (!created_at) return "sin-fecha";
+  const d = new Date(created_at);
+  if (Number.isNaN(d.getTime())) return "sin-fecha";
+  // YYYY-MM-DD
+  return d.toISOString().slice(0, 10);
+}
+
+function formatDateLabel(key) {
+  if (key === "sin-fecha") return "Sin fecha";
+
+  const d = new Date(key + "T00:00:00");
+
+  if (Number.isNaN(d.getTime())) return "Sin fecha";
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+
+  const compare = (a, b) => a.getTime() === b.getTime();
+
+  if (compare(d, today)) return "Hoy";
+  if (compare(d, yesterday)) return "Ayer";
+
+  const formatter = new Intl.DateTimeFormat("es-AR", {
+    weekday: "long",
+    day: "numeric",
+    month: "short",
+  });
+
+  // ej: "martes 25 nov"
+  let label = formatter.format(d);
+  label = label.charAt(0).toUpperCase() + label.slice(1);
+  return label;
+}
 
 export default function ConfesionesPage() {
   const [loading, setLoading] = useState(true);
@@ -146,6 +186,39 @@ export default function ConfesionesPage() {
   const quoteIntentionLabel = quote?.intention
     ? intentionLabels[quote.intention]
     : null;
+
+  // --- Agrupar confesiones por fecha (timeline) ---
+
+  const groupedByDate = useMemo(() => {
+    if (!confessions || confessions.length === 0) return [];
+
+    const groups = new Map();
+
+    for (const conf of confessions) {
+      const key = getDateKey(conf.created_at);
+      if (!groups.has(key)) {
+        groups.set(key, []);
+      }
+      groups.get(key).push(conf);
+    }
+
+    // Ordenar cada grupo por fecha desc (por si la API no viene perfecta)
+    const entries = Array.from(groups.entries()).map(([key, items]) => ({
+      key,
+      items: items.slice().sort((a, b) => {
+        const da = new Date(a.created_at || 0).getTime();
+        const db = new Date(b.created_at || 0).getTime();
+        return db - da;
+      }),
+    }));
+
+    // "sin-fecha" al final, el resto por fecha desc
+    return entries.sort((a, b) => {
+      if (a.key === "sin-fecha") return 1;
+      if (b.key === "sin-fecha") return -1;
+      return a.key < b.key ? 1 : -1; // más reciente primero
+    });
+  }, [confessions]);
 
   return (
     <main className="space-y-5">
@@ -367,8 +440,8 @@ export default function ConfesionesPage() {
         </div>
       </section>
 
-      {/* LISTADO */}
-      <section className="space-y-3">
+      {/* LISTADO CON TIMELINE DE FECHAS */}
+      <section className="space-y-4">
         {confessions.length === 0 && !loading && (
           <p className="text-sm text-slate-400">
             Todavía no hay confesiones para estos filtros. Sé la primera persona
@@ -380,14 +453,45 @@ export default function ConfesionesPage() {
           </p>
         )}
 
-        {confessions.map((conf) => (
-          <ConfessionCard
-            key={conf.id}
-            confession={conf}
-            onReact={handleReact}
-            onReport={handleReport}
-          />
-        ))}
+        {groupedByDate.map((group) => {
+          const label = formatDateLabel(group.key);
+          const count = group.items.length;
+          return (
+            <div key={group.key} className="space-y-2">
+              {/* Cabecera de fecha tipo timeline */}
+              <div className="sticky top-[64px] z-10 flex items-center gap-3 bg-slate-950/85 py-1 backdrop-blur">
+                <div className="relative flex items-center gap-2">
+                  {/* Línea + punto (timeline vertical) */}
+                  <div className="flex flex-col items-center">
+                    <div className="h-4 w-px bg-slate-700/80" />
+                    <div className="h-2.5 w-2.5 rounded-full bg-pink-400 shadow-[0_0_12px_rgba(244,114,182,0.8)]" />
+                  </div>
+                  <div className="h-4 w-px bg-slate-700/60" />
+                </div>
+                <div className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900/90 px-3 py-1">
+                  <span className="text-[11px] font-semibold text-slate-100">
+                    {label}
+                  </span>
+                  <span className="text-[10px] text-slate-400">
+                    {count === 1 ? "1 confesión" : `${count} confesiones`}
+                  </span>
+                </div>
+              </div>
+
+              {/* Confesiones de ese día */}
+              <div className="space-y-3">
+                {group.items.map((conf) => (
+                  <ConfessionCard
+                    key={conf.id}
+                    confession={conf}
+                    onReact={handleReact}
+                    onReport={handleReport}
+                  />
+                ))}
+              </div>
+            </div>
+          );
+        })}
 
         <div className="flex justify-center pt-2">
           {hasMore && (
