@@ -1,7 +1,6 @@
-// src/app/confesar/page.jsx
 "use client";
 
-import { useState, Suspense } from "react";
+import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 
@@ -44,24 +43,8 @@ const INTENTIONS = [
   },
 ];
 
-// 🔹 Componente principal envuelto en Suspense
-export default function ConfesarPage() {
-  return (
-    <Suspense
-      fallback={
-        <main className="max-w-2xl mx-auto space-y-4">
-          <div className="h-6 w-40 rounded-full bg-slate-800 animate-pulse" />
-          <div className="h-40 rounded-2xl bg-slate-900/70 border border-slate-800 animate-pulse" />
-        </main>
-      }
-    >
-      <ConfesarForm />
-    </Suspense>
-  );
-}
-
-// 🔹 Componente interno que sí usa useSearchParams
-function ConfesarForm() {
+// 🔹 Componente interno que SÍ usa useSearchParams
+function ConfesarInner() {
   const searchParams = useSearchParams();
   const promptIdFromUrl = searchParams.get("prompt_id");
 
@@ -287,9 +270,7 @@ function ConfesarForm() {
                       : "border-slate-700 bg-slate-950 text-slate-200 hover:border-pink-400/60"
                   }`}
                 >
-                  <span className="font-semibold text-[11px]">
-                    {opt.label}
-                  </span>
+                  <span className="font-semibold text-[11px]">{opt.label}</span>
                   <span className="text-[11px] text-slate-400">
                     {opt.description}
                   </span>
@@ -356,5 +337,22 @@ function ConfesarForm() {
         </p>
       </form>
     </main>
+  );
+}
+
+// 🔹 Componente de página envuelto en Suspense
+export default function ConfesarPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="max-w-2xl mx-auto space-y-4">
+          <p className="text-sm text-slate-300">
+            Cargando formulario de confesión…
+          </p>
+        </main>
+      }
+    >
+      <ConfesarInner />
+    </Suspense>
   );
 }
