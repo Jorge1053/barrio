@@ -63,7 +63,6 @@ export async function GET(req) {
         userVote = voteRows[0].vote === "truth" ? "truth" : "fake";
       }
     }
-
     return NextResponse.json(
       {
         item: {
