@@ -56,14 +56,16 @@ export default function ConfesionesPage() {
       params.set("category", filters.category);
       params.set("sort", filters.sort);
 
-      const res = await fetch(`/api/confesiones/list?${params.toString()}`);
+      const res = await fetch(`/api/confesiones/list?${params.toString()}`, {
+        cache: "no-store",
+      });
       if (!res.ok) throw new Error("Error al cargar confesiones");
 
       const data = await res.json();
       setHasMore(data.hasMore);
       setPage(pageToLoad);
       setConfessions((prev) =>
-        replace ? data.items : [...prev, ...data.items]
+        replace ? data.items : [...prev, ...(data.items || [])]
       );
     } catch (e) {
       console.error(e);
@@ -96,15 +98,80 @@ export default function ConfesionesPage() {
   }
 
   return (
-    <main className="space-y-4">
-      {/* FILTROS: MOBILE FIRST */}
+    <main className="space-y-5">
+      {/* FEATURE CARDS */}
+      <section className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <Link
+          href="/confesiones/random"
+          className="group rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-3 flex flex-col justify-between"
+        >
+          <div className="space-y-1">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+              Modo aleatorio
+            </p>
+            <h2 className="text-sm font-semibold text-slate-100 flex items-center gap-1">
+              🎲 Confesión al azar
+            </h2>
+            <p className="text-xs text-slate-400">
+              Leé una confesión random, reaccioná y pedí otra. Ideal para
+              scrollear un rato.
+            </p>
+          </div>
+          <span className="mt-3 inline-flex items-center text-[11px] font-medium text-pink-300 group-hover:text-pink-200">
+            Probar ahora →
+          </span>
+        </Link>
+
+        <Link
+          href="/hoy"
+          className="group rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-3 flex flex-col justify-between"
+        >
+          <div className="space-y-1">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+              Pregunta del día
+            </p>
+            <h2 className="text-sm font-semibold text-slate-100 flex items-center gap-1">
+              🗓️ Hoy, ¿de qué hablamos?
+            </h2>
+            <p className="text-xs text-slate-400">
+              Una consigna distinta cada día para confesar sobre un mismo tema.
+            </p>
+          </div>
+          <span className="mt-3 inline-flex items-center text-[11px] font-medium text-pink-300 group-hover:text-pink-200">
+            Ver pregunta del día →
+          </span>
+        </Link>
+
+        <Link
+          href="/confesiones/favoritos"
+          className="group rounded-2xl border border-amber-500/40 bg-amber-500/5 px-4 py-3 flex flex-col justify-between"
+        >
+          <div className="space-y-1">
+            <p className="text-xs font-semibold uppercase tracking-wide text-amber-300/80">
+              Tu colección
+            </p>
+            <h2 className="text-sm font-semibold text-amber-100 flex items-center gap-1">
+              ⭐ Confesiones favoritas
+            </h2>
+            <p className="text-xs text-amber-200/80">
+              Guarda confesiones que te marcaron y volvé a leerlas cuando
+              quieras.
+            </p>
+          </div>
+          <span className="mt-3 inline-flex items-center text-[11px] font-medium text-amber-200 group-hover:text-amber-100">
+            Ver mis favoritas →
+          </span>
+        </Link>
+      </section>
+
+      {/* FILTROS */}
       <section className="rounded-2xl border border-slate-800 bg-slate-900/70 px-3 py-3 md:px-4 md:py-3 space-y-3">
         <div>
           <h2 className="text-sm font-semibold text-slate-100">
             Explora confesiones
           </h2>
           <p className="text-xs text-slate-400">
-            Filtra por ciudad, tema y orden. Todo anónimo, sin nombres ni datos
+            Filtrá por ciudad, tema y orden. Todo anónimo, sin nombres ni datos
             personales.
           </p>
         </div>
@@ -155,15 +222,6 @@ export default function ConfesionesPage() {
               </option>
             ))}
           </select>
-
-          {/* ⭐ Favoritos: full width en mobile, pill en desktop */}
-          <Link
-            href="/confesiones/favoritos"
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-1 rounded-full border border-amber-400/60 bg-amber-500/10 px-3 py-1 text-[11px] font-medium text-amber-200 hover:bg-amber-500/20"
-          >
-            <span>⭐</span>
-            <span>Favoritos</span>
-          </Link>
         </div>
       </section>
 

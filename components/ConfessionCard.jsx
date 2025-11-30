@@ -2,14 +2,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import {
-  MapPin,
-  GraduationCap,
-  Clock,
-  Share2,
-  Star,
-  Flag,
-} from "lucide-react";
+import { MapPin, GraduationCap, Clock, Share2, Star, Flag } from "lucide-react";
+import ConfessionReplies from "./ConfessionReplies"; // comenta esta línea si aún no tienes el componente
 
 const categoryLabels = {
   amor: "Amor",
@@ -31,7 +25,7 @@ export default function ConfessionCard({ confession, onReact, onReport }) {
 
   const {
     id,
-    content,
+    content = "",
     city,
     university,
     category,
@@ -41,20 +35,26 @@ export default function ConfessionCard({ confession, onReact, onReport }) {
     haha_count,
   } = confession;
 
-  const createdLabel = new Intl.DateTimeFormat("es-AR", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(created_at));
+  const likes = likes_count ?? 0;
+  const wow = wow_count ?? 0;
+  const haha = haha_count ?? 0;
+
+  const createdLabel = created_at
+    ? new Intl.DateTimeFormat("es-AR", {
+        dateStyle: "medium",
+        timeStyle: "short",
+      }).format(new Date(created_at))
+    : "";
 
   const shortText =
-    content.length > 260 && !expanded ? content.slice(0, 260) + "..." : content;
+    content.length > 260 && !expanded ? `${content.slice(0, 260)}...` : content;
 
-  const totalReactions =
-    (likes_count || 0) + (wow_count || 0) + (haha_count || 0);
+  const totalReactions = likes + wow + haha;
   const isPopular = totalReactions >= 30;
 
   const shortId = id ? id.slice(0, 6).toUpperCase() : "";
 
+  // Cargar favoritos desde localStorage
   useEffect(() => {
     if (typeof window === "undefined" || !id) return;
     try {
@@ -70,7 +70,7 @@ export default function ConfessionCard({ confession, onReact, onReport }) {
   }, [id]);
 
   async function handleReact(type) {
-    if (sendingReaction) return;
+    if (sendingReaction || !id) return;
     setSendingReaction(true);
     try {
       await onReact?.(id, type);
@@ -83,11 +83,12 @@ export default function ConfessionCard({ confession, onReact, onReport }) {
   }
 
   async function handleReport() {
-    if (sendingReport) return;
+    if (sendingReport || !id) return;
     const reason = window.prompt(
-      "Cuéntanos brevemente por qué consideras que esta confesión debería revisarse:"
+      "Contanos brevemente por qué considerás que esta confesión debería revisarse:"
     );
     if (!reason || reason.trim().length < 5) return;
+
     setSendingReport(true);
     try {
       await onReport?.(id, reason.trim());
@@ -101,10 +102,12 @@ export default function ConfessionCard({ confession, onReact, onReport }) {
   }
 
   async function handleShare() {
+    if (!id) return;
     try {
       const origin =
         typeof window !== "undefined" ? window.location.origin : "";
-      const url = origin ? `${origin}/confesiones/${id}` : window.location.href;
+      const url = origin ? `${origin}/confesiones/${id}` : "";
+
       const shareText = `Confesión #${shortId} desde ConfesionarioAR`;
 
       if (
@@ -116,12 +119,16 @@ export default function ConfessionCard({ confession, onReact, onReport }) {
           text: shareText,
           url,
         });
-      } else if (navigator.clipboard && url) {
+      } else if (
+        typeof navigator !== "undefined" &&
+        navigator.clipboard &&
+        url
+      ) {
         await navigator.clipboard.writeText(url);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
-      } else {
-        window.prompt("Copia este link:", url);
+      } else if (url) {
+        window.prompt("Copiá este link:", url);
       }
     } catch (e) {
       console.error(e);
@@ -173,10 +180,14 @@ export default function ConfessionCard({ confession, onReact, onReport }) {
               </span>
             )}
           </div>
-          <div className="inline-flex items-center gap-1 text-[11px] text-slate-500">
-            <Clock className="h-3 w-3 text-slate-500" />
-            <span>{createdLabel}</span>
-          </div>
+
+          {createdLabel && (
+            <div className="inline-flex items-center gap-1 text-[11px] text-slate-500">
+              <Clock className="h-3 w-3 text-slate-500" />
+              <span>{createdLabel}</span>
+            </div>
+          )}
+
           {shortId && (
             <span className="mt-1 inline-flex items-center gap-1 text-[11px] text-slate-500">
               <span className="uppercase tracking-wide text-slate-400">
@@ -188,25 +199,25 @@ export default function ConfessionCard({ confession, onReact, onReport }) {
         </div>
 
         <div className="flex flex-col items-end gap-1">
-          <span className="inline-flex items-center rounded-full bg-pink-500/12 text-pink-200 px-3 py-1 text-[11px] font-medium border border-pink-500/35">
+          <span className="inline-flex items-center rounded-full border border-pink-500/35 bg-pink-500/12 px-3 py-1 text-[11px] font-medium text-pink-200">
             {categoryLabels[category] || category}
           </span>
           {isPopular && (
-            <span className="inline-flex items-center rounded-full bg-amber-500/10 text-amber-300 px-2.5 py-0.5 text-[10px] font-semibold border border-amber-500/40">
+            <span className="inline-flex items-center rounded-full border border-amber-500/40 bg-amber-500/10 px-2.5 py-0.5 text-[10px] font-semibold text-amber-300">
               🔥 Popular
             </span>
           )}
         </div>
       </header>
 
-      {/* TEXTO – con break-words para evitar que se salga */}
+      {/* TEXTO */}
       <p className="text-sm leading-relaxed text-slate-100 whitespace-pre-wrap break-words">
         {shortText}
         {content.length > 260 && (
           <button
             type="button"
             onClick={() => setExpanded((v) => !v)}
-            className="ml-2 text-xs text-pink-300 hover:text-pink-200 underline"
+            className="ml-2 text-xs text-pink-300 underline hover:text-pink-200"
           >
             {expanded ? "Ver menos" : "Ver más"}
           </button>
@@ -215,37 +226,38 @@ export default function ConfessionCard({ confession, onReact, onReport }) {
 
       {/* FOOTER */}
       <footer className="mt-4 space-y-3 text-xs">
+        {/* Reacciones */}
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="inline-flex flex-wrap items-center gap-2">
             <button
               type="button"
               disabled={sendingReaction}
               onClick={() => handleReact("like")}
-              className="inline-flex items-center gap-1 rounded-full bg-slate-800/90 hover:bg-slate-700 px-3 py-1.5 transition-colors disabled:opacity-60"
+              className="inline-flex items-center gap-1 rounded-full bg-slate-800/90 px-3 py-1.5 text-xs transition-colors hover:bg-slate-700 disabled:opacity-60"
               aria-label="Reacción me gusta"
             >
               <span className="text-base">❤️</span>
-              <span>{likes_count}</span>
+              <span>{likes}</span>
             </button>
             <button
               type="button"
               disabled={sendingReaction}
               onClick={() => handleReact("wow")}
-              className="inline-flex items-center gap-1 rounded-full bg-slate-800/90 hover:bg-slate-700 px-3 py-1.5 transition-colors disabled:opacity-60"
+              className="inline-flex items-center gap-1 rounded-full bg-slate-800/90 px-3 py-1.5 text-xs transition-colors hover:bg-slate-700 disabled:opacity-60"
               aria-label="Reacción sorpresa"
             >
               <span className="text-base">😮</span>
-              <span>{wow_count}</span>
+              <span>{wow}</span>
             </button>
             <button
               type="button"
               disabled={sendingReaction}
               onClick={() => handleReact("haha")}
-              className="inline-flex items-center gap-1 rounded-full bg-slate-800/90 hover:bg-slate-700 px-3 py-1.5 transition-colors disabled:opacity-60"
+              className="inline-flex items-center gap-1 rounded-full bg-slate-800/90 px-3 py-1.5 text-xs transition-colors hover:bg-slate-700 disabled:opacity-60"
               aria-label="Reacción risa"
             >
               <span className="text-base">😂</span>
-              <span>{haha_count}</span>
+              <span>{haha}</span>
             </button>
           </div>
 
@@ -254,24 +266,28 @@ export default function ConfessionCard({ confession, onReact, onReport }) {
           </span>
         </div>
 
+        {/* Acciones secundarias */}
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="inline-flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={handleShare}
-              className="inline-flex items-center gap-1 rounded-full bg-slate-800/90 hover:bg-slate-700 px-3 py-1.5 transition-colors"
+              className="inline-flex items-center gap-1 rounded-full bg-slate-800/90 px-3 py-1.5 text-xs transition-colors hover:bg-slate-700"
             >
               <Share2 className="h-3.5 w-3.5 text-slate-200" />
               <span>{copied ? "Link copiado" : "Compartir"}</span>
             </button>
+
             <button
               type="button"
               onClick={toggleFavorite}
-              className="inline-flex items-center gap-1 rounded-full bg-slate-800/90 hover:bg-slate-700 px-3 py-1.5 transition-colors"
+              className="inline-flex items-center gap-1 rounded-full bg-slate-800/90 px-3 py-1.5 text-xs transition-colors hover:bg-slate-700"
             >
               <Star
                 className={`h-3.5 w-3.5 ${
-                  isFavorite ? "fill-amber-300 text-amber-300" : "text-slate-200"
+                  isFavorite
+                    ? "fill-amber-300 text-amber-300"
+                    : "text-slate-200"
                 }`}
               />
               <span>{isFavorite ? "Guardada" : "Guardar"}</span>
@@ -289,6 +305,9 @@ export default function ConfessionCard({ confession, onReact, onReport }) {
           </button>
         </div>
       </footer>
+
+      {/* Comentarios anónimos (opcional, si tienes el componente) */}
+      {id && <ConfessionReplies confessionId={id} />}
     </article>
   );
 }

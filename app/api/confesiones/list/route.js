@@ -8,11 +8,18 @@ export async function GET(req) {
   const supabase = createSupabaseServerClient();
   const { searchParams } = new URL(req.url);
 
-  const page = parseInt(searchParams.get("page") || "1", 10);
+  // Parámetros de query
+  const pageParam = searchParams.get("page") || "1";
   const city = searchParams.get("city") || "todos";
   const category = searchParams.get("category") || "todos";
   const sort = searchParams.get("sort") || "new";
+  const promptId = searchParams.get("prompt_id") || null;
 
+  // Aseguramos página válida (>= 1)
+  let page = parseInt(pageParam, 10);
+  if (!Number.isFinite(page) || page < 1) page = 1;
+
+  // Base query
   let query = supabase
     .from("confessions")
     .select(
@@ -31,29 +38,37 @@ export async function GET(req) {
     )
     .eq("status", "approved");
 
+  // Filtros
   if (city && city !== "todos") {
     query = query.eq("city", city);
   }
+
   if (category && category !== "todos") {
     query = query.eq("category", category);
   }
 
+  if (promptId) {
+    query = query.eq("prompt_id", promptId);
+  }
+
+  // Orden
   if (sort === "top") {
     query = query
-      .order("likes_count", { ascending: false })
+      .order("likes_count", { ascending: false, nullsFirst: false })
       .order("created_at", { ascending: false });
   } else {
-    // new
+    // "new" por defecto
     query = query.order("created_at", { ascending: false });
   }
 
+  // Paginación
   const from = (page - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
 
   const { data, error, count } = await query.range(from, to);
 
   if (error) {
-    console.error(error);
+    console.error("Error al cargar confesiones:", error);
     return NextResponse.json(
       { message: "Error al cargar confesiones." },
       { status: 500 }

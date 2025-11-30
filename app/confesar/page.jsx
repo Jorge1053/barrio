@@ -2,6 +2,8 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 
 const CITIES = [
   "Buenos Aires",
@@ -22,6 +24,9 @@ const CATEGORIES = [
 ];
 
 export default function ConfesarPage() {
+  const searchParams = useSearchParams();
+  const promptIdFromUrl = searchParams.get("prompt_id");
+
   const [form, setForm] = useState({
     city: "",
     university: "",
@@ -48,6 +53,7 @@ export default function ConfesarPage() {
       setError("Selecciona una categoría.");
       return;
     }
+
     const length = form.content.trim().length;
     if (length < 30) {
       setError(
@@ -62,15 +68,22 @@ export default function ConfesarPage() {
 
     setSubmitting(true);
     try {
+      const payload = {
+        ...form,
+        prompt_id: promptIdFromUrl || null,
+      };
+
       const res = await fetch("/api/confesiones/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       });
+
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.message || "Error al enviar la confesión.");
       }
+
       setSubmitted(true);
       setForm({
         city: "",
@@ -80,7 +93,7 @@ export default function ConfesarPage() {
       });
     } catch (e) {
       console.error(e);
-      setError(e.message);
+      setError(e.message || "Error al enviar la confesión.");
     } finally {
       setSubmitting(false);
     }
@@ -88,28 +101,40 @@ export default function ConfesarPage() {
 
   if (submitted) {
     return (
-      <main className="space-y-4">
-        <h2 className="text-lg font-semibold text-slate-100">
-          Gracias por tu confianza 💜
-        </h2>
-        <p className="text-sm text-slate-300">
-          Tu confesión se envió y será revisada según las reglas de la
-          comunidad. No se publican nombres, ni datos personales, ni contenido
-          que pueda dañar a alguien.
-        </p>
-        <button
-          type="button"
-          onClick={() => setSubmitted(false)}
-          className="px-4 py-2 text-sm rounded-full bg-pink-500 hover:bg-pink-400 text-slate-950 font-medium"
-        >
-          Enviar otra confesión
-        </button>
+      <main className="max-w-2xl mx-auto space-y-4">
+        <section className="space-y-2">
+          <h2 className="text-lg font-semibold text-slate-100">
+            Gracias por tu confianza 💜
+          </h2>
+          <p className="text-sm text-slate-300">
+            Tu confesión se envió y será revisada según las reglas de la
+            comunidad. No se publican nombres, ni datos personales, ni contenido
+            que pueda dañar a alguien.
+          </p>
+        </section>
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setSubmitted(false)}
+            className="px-4 py-2 text-sm rounded-full bg-pink-500 hover:bg-pink-400 text-slate-950 font-medium"
+          >
+            Enviar otra confesión
+          </button>
+          <Link
+            href="/confesiones"
+            className="px-4 py-2 text-sm rounded-full border border-slate-600 hover:bg-slate-800 text-slate-100"
+          >
+            Ver confesiones
+          </Link>
+        </div>
       </main>
     );
   }
 
   return (
-    <main className="max-w-2xl space-y-5">
+    <main className="max-w-2xl mx-auto space-y-5">
+      {/* INTRO */}
       <section className="space-y-2">
         <h2 className="text-lg font-semibold text-slate-100">
           Confiesa de forma anónima
@@ -119,13 +144,23 @@ export default function ConfesarPage() {
           que identifique directamente a una persona. Tampoco se permite odio,
           amenazas ni incitación a la violencia.
         </p>
+
+        {promptIdFromUrl && (
+          <p className="text-xs text-pink-200 bg-pink-500/10 border border-pink-500/40 rounded-xl px-3 py-2">
+            Estás respondiendo a la{" "}
+            <span className="font-semibold">pregunta del día</span>. Recordá que
+            igual se aplican todas las reglas de la comunidad.
+          </p>
+        )}
       </section>
 
+      {/* FORMULARIO */}
       <form
         onSubmit={handleSubmit}
         className="space-y-4 rounded-2xl border border-slate-800 bg-slate-900/70 p-4"
       >
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+        {/* Ciudad / Universidad */}
+        <div className="grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
           <div className="space-y-1.5">
             <label className="block text-xs font-medium text-slate-300">
               Ciudad <span className="text-pink-400">*</span>
@@ -143,6 +178,7 @@ export default function ConfesarPage() {
               ))}
             </select>
           </div>
+
           <div className="space-y-1.5">
             <label className="block text-xs font-medium text-slate-300">
               Universidad (opcional)
@@ -157,6 +193,7 @@ export default function ConfesarPage() {
           </div>
         </div>
 
+        {/* Categoría */}
         <div className="space-y-1.5 text-sm">
           <label className="block text-xs font-medium text-slate-300">
             Tema principal <span className="text-pink-400">*</span>
@@ -167,7 +204,7 @@ export default function ConfesarPage() {
                 key={c.value}
                 type="button"
                 onClick={() => updateField("category", c.value)}
-                className={`px-3 py-1 rounded-full border text-xs ${
+                className={`px-3 py-1 rounded-full border text-xs transition-colors ${
                   form.category === c.value
                     ? "bg-pink-500 text-slate-950 border-pink-400"
                     : "bg-slate-950 border-slate-700 text-slate-300 hover:border-pink-400/60"
@@ -179,6 +216,7 @@ export default function ConfesarPage() {
           </div>
         </div>
 
+        {/* Texto de la confesión */}
         <div className="space-y-1.5 text-sm">
           <label className="block text-xs font-medium text-slate-300">
             Tu confesión <span className="text-pink-400">*</span>
@@ -196,12 +234,14 @@ export default function ConfesarPage() {
           </div>
         </div>
 
+        {/* Error */}
         {error && (
           <p className="text-xs text-red-400 bg-red-950/40 border border-red-800 rounded-xl px-3 py-2">
             {error}
           </p>
         )}
 
+        {/* Botón submit */}
         <button
           type="submit"
           disabled={submitting}
@@ -210,12 +250,13 @@ export default function ConfesarPage() {
           {submitting ? "Enviando..." : "Enviar confesión anónima"}
         </button>
 
+        {/* Nota legal */}
         <p className="text-[11px] text-slate-500">
-          Al enviar aceptas las{" "}
-          <a href="/reglas" className="text-pink-300 underline">
+          Al enviar aceptás las{" "}
+          <Link href="/reglas" className="text-pink-300 underline">
             reglas de la comunidad
-          </a>
-          . No almacenas tu nombre ni tu email.
+          </Link>
+          . No se almacena tu nombre ni tu email.
         </p>
       </form>
     </main>
