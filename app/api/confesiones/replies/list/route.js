@@ -16,10 +16,10 @@ export async function GET(req) {
 
   const { data, error } = await supabase
     .from("confession_replies")
-    .select("id, confession_id, content, created_at")
+    .select("id, confession_id, content, created_at, status, likes_count")
     .eq("confession_id", confessionId)
     .eq("status", "approved")
-    .order("created_at", { ascending: true });
+    .order("created_at", { ascending: false }); // 🔹 más recientes arriba
 
   if (error) {
     console.error(error);

@@ -1,12 +1,17 @@
 // src/app/api/confesiones/replies/create/route.js
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "../../../../../lib/supabaseServer";
+import { autoModerateText } from "../../../../../lib/moderation";
+import { getRequestFingerprint } from "../../../../../lib/fingerprint";
 
 export async function POST(req) {
+  const supabase = createSupabaseServerClient();
+
   try {
     const body = await req.json();
-    const { confession_id, content, fingerprint } = body || {};
+    const { confession_id, content } = body || {};
 
+    // Validaciones básicas
     if (!confession_id || typeof confession_id !== "string") {
       return NextResponse.json(
         { message: "Falta el ID de la confesión." },
@@ -15,30 +20,57 @@ export async function POST(req) {
     }
 
     const text = (content || "").trim();
+
     if (text.length < 10) {
       return NextResponse.json(
         { message: "Escribí al menos 10 caracteres." },
         { status: 400 }
       );
     }
-    if (text.length > 500) {
+
+    if (text.length > 800) {
       return NextResponse.json(
-        { message: "El comentario es demasiado largo. Máximo 500 caracteres." },
+        { message: "Máximo 800 caracteres." },
         { status: 400 }
       );
     }
 
-    const supabase = createSupabaseServerClient();
+    // Moderación automática (OpenAI)
+    const moderation = await autoModerateText(text);
 
+    // Bloqueo solo para cosas MUY graves
+    if (!moderation.allowed && moderation.level === "hard") {
+      return NextResponse.json(
+        {
+          message:
+            moderation.message ??
+            "Tu comentario no cumple las normas de la comunidad.",
+        },
+        { status: 400 }
+      );
+    }
+
+    // Fingerprint del cliente
+    const fingerprint = getRequestFingerprint(req.headers);
+
+    // Guardar como aprobado para que se vea al toque
     const { data, error } = await supabase
       .from("confession_replies")
       .insert({
         confession_id,
         content: text,
-        status: "pending", // se aprobará desde el panel admin
-        fingerprint: fingerprint || null,
+        status: "approved",
+        fingerprint,
       })
-      .select("id, created_at, status")
+      .select(
+        `
+        id,
+        confession_id,
+        content,
+        created_at,
+        status
+      `
+      )
       .single();
 
     if (error) {
@@ -51,8 +83,8 @@ export async function POST(req) {
 
     return NextResponse.json(
       {
-        message: "Comentario enviado. Se publicará cuando pase la moderación.",
-        reply: data,
+        message: "Comentario publicado.",
+        item: data,
       },
       { status: 201 }
     );

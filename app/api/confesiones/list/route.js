@@ -8,18 +8,14 @@ export async function GET(req) {
   const supabase = createSupabaseServerClient();
   const { searchParams } = new URL(req.url);
 
-  // Parámetros de query
-  const pageParam = searchParams.get("page") || "1";
+  const page = parseInt(searchParams.get("page") || "1", 10);
   const city = searchParams.get("city") || "todos";
   const category = searchParams.get("category") || "todos";
   const sort = searchParams.get("sort") || "new";
-  const promptId = searchParams.get("prompt_id") || null;
 
-  // Aseguramos página válida (>= 1)
-  let page = parseInt(pageParam, 10);
-  if (!Number.isFinite(page) || page < 1) page = 1;
+  const from = (page - 1) * PAGE_SIZE;
+  const to = from + PAGE_SIZE - 1;
 
-  // Base query
   let query = supabase
     .from("confessions")
     .select(
@@ -29,59 +25,55 @@ export async function GET(req) {
       university,
       category,
       content,
+      status,
       created_at,
       likes_count,
       wow_count,
-      haha_count
-    `,
-      { count: "exact" }
+      haha_count,
+      intention
+    `
     )
     .eq("status", "approved");
 
-  // Filtros
-  if (city && city !== "todos") {
+  if (city !== "todos") {
     query = query.eq("city", city);
   }
 
-  if (category && category !== "todos") {
+  if (category !== "todos") {
     query = query.eq("category", category);
   }
 
-  if (promptId) {
-    query = query.eq("prompt_id", promptId);
-  }
-
-  // Orden
   if (sort === "top") {
+    // ordenar por reacciones totales (likes + wow + haha)
     query = query
       .order("likes_count", { ascending: false, nullsFirst: false })
-      .order("created_at", { ascending: false });
+      .order("wow_count", { ascending: false, nullsFirst: false })
+      .order("haha_count", { ascending: false, nullsFirst: false });
   } else {
-    // "new" por defecto
+    // "new" → más nuevas primero
     query = query.order("created_at", { ascending: false });
   }
 
-  // Paginación
-  const from = (page - 1) * PAGE_SIZE;
-  const to = from + PAGE_SIZE - 1;
+  query = query.range(from, to);
 
-  const { data, error, count } = await query.range(from, to);
+  const { data, error } = await query;
 
   if (error) {
-    console.error("Error al cargar confesiones:", error);
+    console.error("Error al listar confesiones:", error);
     return NextResponse.json(
       { message: "Error al cargar confesiones." },
       { status: 500 }
     );
   }
 
-  const total = count || 0;
-  const hasMore = to + 1 < total;
+  const items = (data || []).map((c) => ({
+    ...c,
+    likes_count: c.likes_count ?? 0,
+    wow_count: c.wow_count ?? 0,
+    haha_count: c.haha_count ?? 0,
+  }));
 
-  return NextResponse.json({
-    items: data || [],
-    hasMore,
-    total,
-    page,
-  });
+  const hasMore = items.length === PAGE_SIZE;
+
+  return NextResponse.json({ items, hasMore });
 }
