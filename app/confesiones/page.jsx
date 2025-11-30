@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import ConfessionCard from "../../components/ConfessionCard";
 
 const CITIES = [
@@ -96,7 +97,8 @@ export default function ConfesionesPage() {
 
   return (
     <main className="space-y-4">
-      <section className="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-3 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+      {/* FILTROS: MOBILE FIRST */}
+      <section className="rounded-2xl border border-slate-800 bg-slate-900/70 px-3 py-3 md:px-4 md:py-3 space-y-3">
         <div>
           <h2 className="text-sm font-semibold text-slate-100">
             Explora confesiones
@@ -106,9 +108,11 @@ export default function ConfesionesPage() {
             personales.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2 text-xs">
+
+        <div className="flex flex-col gap-2 text-xs sm:flex-row sm:flex-wrap sm:items-center">
+          {/* Ciudad */}
           <select
-            className="bg-slate-950 border border-slate-700 rounded-full px-3 py-1"
+            className="w-full sm:w-auto bg-slate-950 border border-slate-700 rounded-full px-3 py-1"
             value={filters.city}
             onChange={(e) =>
               setFilters((f) => ({ ...f, city: e.target.value }))
@@ -121,8 +125,10 @@ export default function ConfesionesPage() {
               </option>
             ))}
           </select>
+
+          {/* Categoría */}
           <select
-            className="bg-slate-950 border border-slate-700 rounded-full px-3 py-1"
+            className="w-full sm:w-auto bg-slate-950 border border-slate-700 rounded-full px-3 py-1"
             value={filters.category}
             onChange={(e) =>
               setFilters((f) => ({ ...f, category: e.target.value }))
@@ -134,8 +140,10 @@ export default function ConfesionesPage() {
               </option>
             ))}
           </select>
+
+          {/* Orden */}
           <select
-            className="bg-slate-950 border border-slate-700 rounded-full px-3 py-1"
+            className="w-full sm:w-auto bg-slate-950 border border-slate-700 rounded-full px-3 py-1"
             value={filters.sort}
             onChange={(e) =>
               setFilters((f) => ({ ...f, sort: e.target.value }))
@@ -147,17 +155,27 @@ export default function ConfesionesPage() {
               </option>
             ))}
           </select>
+
+          {/* ⭐ Favoritos: full width en mobile, pill en desktop */}
+          <Link
+            href="/confesiones/favoritos"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-1 rounded-full border border-amber-400/60 bg-amber-500/10 px-3 py-1 text-[11px] font-medium text-amber-200 hover:bg-amber-500/20"
+          >
+            <span>⭐</span>
+            <span>Favoritos</span>
+          </Link>
         </div>
       </section>
 
+      {/* LISTADO */}
       <section className="space-y-3">
         {confessions.length === 0 && !loading && (
           <p className="text-sm text-slate-400">
             Todavía no hay confesiones para estos filtros. Sé la primera persona
             en{" "}
-            <a href="/confesar" className="text-pink-300 underline">
+            <Link href="/confesar" className="text-pink-300 underline">
               confesar algo
-            </a>
+            </Link>
             .
           </p>
         )}
@@ -183,6 +201,7 @@ export default function ConfesionesPage() {
             </button>
           )}
         </div>
+
         {loading && confessions.length === 0 && (
           <p className="text-sm text-slate-400">Cargando confesiones...</p>
         )}
