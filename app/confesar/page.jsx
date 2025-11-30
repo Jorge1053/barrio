@@ -1,7 +1,7 @@
 // src/app/confesar/page.jsx
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 
@@ -44,7 +44,24 @@ const INTENTIONS = [
   },
 ];
 
+// 🔹 Componente principal envuelto en Suspense
 export default function ConfesarPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="max-w-2xl mx-auto space-y-4">
+          <div className="h-6 w-40 rounded-full bg-slate-800 animate-pulse" />
+          <div className="h-40 rounded-2xl bg-slate-900/70 border border-slate-800 animate-pulse" />
+        </main>
+      }
+    >
+      <ConfesarForm />
+    </Suspense>
+  );
+}
+
+// 🔹 Componente interno que sí usa useSearchParams
+function ConfesarForm() {
   const searchParams = useSearchParams();
   const promptIdFromUrl = searchParams.get("prompt_id");
 
@@ -53,7 +70,7 @@ export default function ConfesarPage() {
     university: "",
     category: "amor",
     content: "",
-    intention: "advice", // 🔹 default: consejo, no desahogo
+    intention: "advice", // default: consejo
   });
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -99,7 +116,7 @@ export default function ConfesarPage() {
         university: form.university || null,
         category: form.category,
         content: form.content,
-        intention: form.intention, // 🔹 se manda tal cual
+        intention: form.intention,
         prompt_id: promptIdFromUrl || null,
       };
 
@@ -120,7 +137,7 @@ export default function ConfesarPage() {
         university: "",
         category: "amor",
         content: "",
-        intention: "advice", // 🔹 reset a consejo
+        intention: "advice",
       });
     } catch (e) {
       console.error(e);
@@ -270,7 +287,9 @@ export default function ConfesarPage() {
                       : "border-slate-700 bg-slate-950 text-slate-200 hover:border-pink-400/60"
                   }`}
                 >
-                  <span className="font-semibold text-[11px]">{opt.label}</span>
+                  <span className="font-semibold text-[11px]">
+                    {opt.label}
+                  </span>
                   <span className="text-[11px] text-slate-400">
                     {opt.description}
                   </span>
